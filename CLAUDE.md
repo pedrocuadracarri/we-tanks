@@ -38,7 +38,7 @@ el móvil mediante una media query de `orientation: portrait`; no hay JavaScript
 | `src/levels.ts` | **Mapas.** Geometría del mundo y los 18 niveles como texto. |
 | `src/theme.ts` | **Aspecto.** Paletas por tramos, textura de suelo, viñeta y muros. |
 | `src/Joystick.ts` | Joystick virtual: aparece donde tocas y devuelve un vector. |
-| `src/audio.ts` | Efectos sintetizados (osciladores + ruido filtrado) y mute persistente. |
+| `src/audio.ts` | Efectos y música sintetizados (osciladores + ruido), mute persistente y `vibrate()`. |
 | `src/progress.ts` | Récord y partida en curso en `localStorage`. |
 | `public/` | `manifest.webmanifest`, `sw.js`, `logo.png` e iconos de la PWA. |
 | `scripts/make-icons.mjs` | Genera los PNG de los iconos sin dependencias (`npm run icons`). |
@@ -56,6 +56,11 @@ entrar en `GameScene.ts` para eso.
 Mientras apuntas se dibuja una **línea de mira** que incluye el primer rebote. Apuntar no gasta
 munición: el disparo sale al levantar el dedo. Un toque sin arrastrar dispara en la dirección
 en la que ya mira la torreta.
+
+El HUD lleva un contador de **balas libres** (`BALAS ●●●○○`): con 5 tuyas en pantalla dejas de
+disparar, y sin el contador eso parece que el juego se ha roto. En el nivel 1 sale un aviso de que
+se dispara al soltar, que desaparece con tu primer disparo. Las explosiones vibran el móvil
+(`navigator.vibrate`), y la vibración **no** depende del mute: si silencias es por no hacer ruido.
 
 ## Reglas
 
@@ -205,29 +210,36 @@ Los niveles 17 y 18 se bajaron de 8 a 6 enemigos por sospecha, no por medición,
 bastante más letal después de esa estimación. Si hay que aflojar, los primeros candidatos son
 `cooldown` y `lead` en `config.ts`.
 
+## Música
+
+`audio.ts` tiene un loop de fondo (clase `Music`) sobre Am-F-C-G a 96 bpm: bajo, arpegio y charles,
+sin ficheros. Va por su **propio bus de ganancia** (`MUSIC_VOL = 0.13`) para mezclarlo aparte de los
+efectos, aunque el botón de mute silencia las dos cosas.
+
+- Las notas se programan **con antelación** (`schedule()` mira 0.4 s por delante y lo llama un
+  `setInterval` de 120 ms). Programar nota a nota desde el temporizador sonaría a destiempo: el reloj
+  bueno es `ctx.currentTime`, no el de JS.
+- Arranca dentro de `sfx.unlock()`, que es el único sitio donde hay garantía de gesto del usuario.
+- Un listener de `visibilitychange` suspende el `AudioContext` con la pestaña oculta. De paso eso
+  frena el programador solo: con el reloj congelado, `schedule()` deja de tener hueco por delante.
+
 ## Próximos pasos
 
-### 1. Publicar de verdad
+### 1. Jugar la campaña entera
 
-Todo lo del lado del código está hecho y el repo git ya existe con el primer commit en `main`.
-Falta lo que exige una cuenta: crear el repo vacío en GitHub, `git remote add origin ...`,
-`git push -u origin main` y en *Settings → Pages* elegir **GitHub Actions** como origen. El
-workflow ya está en el repo.
+Lo único importante que sigue sin hacerse. Ver arriba, en Estado.
 
-### 2. Vibración en los impactos
-
-`navigator.vibrate()` en explosiones y muerte. Una línea, y en móvil cambia mucho la sensación.
-
-### 3. Modo sin fin
+### 2. Modo sin fin
 
 Los 18 niveles se acaban. Mapas generados con dificultad creciente compitiendo contra tu récord.
 El formato de nivel es texto, así que generarlos es fácil; lo difícil es garantizar que sean
 jugables (que el jugador no aparezca encerrado y que haya rutas abiertas).
 
+### 3. Distinguir los tanques por algo más que el color
+
+Siete tipos y siete colores. Un número o una silueta en la torreta se lee mejor de un vistazo y
+deja de ser un problema para daltónicos.
+
 ### 4. Ajustes
 
 Sensibilidad y tamaño del joystick, e intercambiar los dos joysticks para zurdos.
-
-### 5. Música de fondo
-
-Un loop sintetizado en el mismo estilo que `audio.ts`, con volumen propio separado de los efectos.

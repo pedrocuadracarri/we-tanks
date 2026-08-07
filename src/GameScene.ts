@@ -16,7 +16,7 @@ import {
   START_LIVES,
   EXTRA_LIFE_EVERY,
 } from "./config";
-import { sfx } from "./audio";
+import { sfx, vibrate } from "./audio";
 import { saveProgress, saveRun, clearRun } from "./progress";
 import { Theme, themeForLevel, makeWallTextures, applyBackdrop, scatterDecals } from "./theme";
 
@@ -88,6 +88,9 @@ export class GameScene extends Phaser.Scene {
   private hudRight!: Phaser.GameObjects.Text;
   private muteBtn!: Phaser.GameObjects.Text;
   private pauseBtn!: Phaser.GameObjects.Text;
+  private hudAmmo!: Phaser.GameObjects.Text;
+  private shownAmmo = -1;
+  private hint: Phaser.GameObjects.Text | null = null;
   private message!: Phaser.GameObjects.Text;
 
   constructor() {
@@ -499,6 +502,21 @@ export class GameScene extends Phaser.Scene {
       .text(WIDTH / 2, 10, "❚❚ PAUSA", { ...style, fontSize: "17px", color: "#9a9aa8" })
       .setOrigin(0.5, 0)
       .setDepth(200);
+    this.hudAmmo = this.add
+      .text(12, 34, "", { ...style, fontSize: "17px", color: "#f5e7b0" })
+      .setDepth(200);
+    if (this.level === 0) {
+      this.hint = this.add
+        .text(WIDTH / 2, HEIGHT - 34, "Apunta arrastrando en la mitad derecha · suelta para disparar", {
+          fontFamily: "monospace",
+          fontSize: "17px",
+          color: "#ffffff",
+          backgroundColor: "#000000aa",
+          padding: { x: 12, y: 7 },
+        })
+        .setOrigin(0.5)
+        .setDepth(200);
+    }
     this.message = this.add
       .text(WIDTH / 2, HEIGHT / 2, "", {
         fontFamily: "monospace",
@@ -519,6 +537,14 @@ export class GameScene extends Phaser.Scene {
     this.hudRight.setText(`${"♥".repeat(Math.max(this.lives, 0))}   ${this.score}`);
     const label = this.mineButton.getData("label") as Phaser.GameObjects.Text;
     label.setText(`${PLAYER_MAX_MINES - this.countMines(this.player)}`);
+  }
+
+  /** Balas libres. Sin esto llegas al tope de 5 en pantalla y no sabes por qué no dispara. */
+  private updateAmmo() {
+    const free = PLAYER_MAX_BULLETS - this.countBullets(this.player);
+    if (free === this.shownAmmo) return; // setText re-renderiza la textura: solo al cambiar
+    this.shownAmmo = free;
+    this.hudAmmo.setText(`BALAS ${"●".repeat(free)}${"○".repeat(PLAYER_MAX_BULLETS - free)}`);
   }
 
   // ---------------- bucle ----------------
@@ -544,6 +570,7 @@ export class GameScene extends Phaser.Scene {
       if (b.active) this.trail.emitParticleAt(b.x, b.y);
     }
     this.drawAim();
+    this.updateAmmo();
     if (this.flash.alpha > 0) this.flash.setAlpha(Math.max(0, this.flash.alpha - delta / 180));
   }
 
@@ -780,8 +807,18 @@ export class GameScene extends Phaser.Scene {
     bullet.maxBounces = cfg.bounces;
     bullet.armedAt = time + 60;
 
-    if (tank.isPlayer) sfx.shoot();
-    else sfx.enemyShoot();
+    if (tank.isPlayer) {
+      sfx.shoot();
+      this.dismissHint();
+    } else sfx.enemyShoot();
+  }
+
+  /** El aviso del primer nivel se va con el primer disparo: ya lo has entendido. */
+  private dismissHint() {
+    if (!this.hint) return;
+    const hint = this.hint;
+    this.hint = null;
+    this.tweens.add({ targets: hint, alpha: 0, duration: 400, onComplete: () => hint.destroy() });
   }
 
   private countBullets(tank: Tank) {
@@ -879,6 +916,7 @@ export class GameScene extends Phaser.Scene {
     mine.destroy();
 
     sfx.explode();
+    vibrate(45);
     this.debris.explode(26, x, y);
     const flash = this.add.circle(x, y, MINE_BLAST_RADIUS, 0xffb703, 0.55).setDepth(25);
     this.tweens.add({ targets: flash, alpha: 0, scale: 1.15, duration: 260, onComplete: () => flash.destroy() });
@@ -924,6 +962,7 @@ export class GameScene extends Phaser.Scene {
     this.impactFeedback();
 
     const wasPlayer = tank.isPlayer;
+    vibrate(wasPlayer ? 200 : 25);
     const points = tank.cfg.points;
     tank.turret.destroy();
     tank.shadow.destroy();
