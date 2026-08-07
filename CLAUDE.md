@@ -18,9 +18,9 @@ el móvil mediante una media query de `orientation: portrait`; no hay JavaScript
 
 ## Stack
 
-- **Phaser 3.90** con física Arcade. Sin assets externos: todas las texturas se generan en
-  tiempo de ejecución con `Graphics.generateTexture()` y todos los sonidos se sintetizan con
-  WebAudio. El juego es un único `.js`; no descarga nada.
+- **Phaser 3.90** con física Arcade. Todas las texturas del juego se generan en tiempo de ejecución
+  con `Graphics.generateTexture()` y todos los sonidos se sintetizan con WebAudio. El único fichero
+  que se descarga aparte del bundle es `public/logo.png` (el logo del título), y los iconos de la PWA.
 - **Vite 8** + **TypeScript 5.9** en modo estricto.
 - Mundo fijo de **960×540** con `Scale.FIT`, así que escala a cualquier pantalla sin recolocar nada.
 
@@ -38,7 +38,7 @@ el móvil mediante una media query de `orientation: portrait`; no hay JavaScript
 | `src/Joystick.ts` | Joystick virtual: aparece donde tocas y devuelve un vector. |
 | `src/audio.ts` | Efectos sintetizados (osciladores + ruido filtrado) y mute persistente. |
 | `src/progress.ts` | Récord y partida en curso en `localStorage`. |
-| `public/` | `manifest.webmanifest`, `sw.js` e iconos de la PWA. |
+| `public/` | `manifest.webmanifest`, `sw.js`, `logo.png` e iconos de la PWA. |
 | `scripts/make-icons.mjs` | Genera los PNG de los iconos sin dependencias (`npm run icons`). |
 
 Para tocar la dificultad, `config.ts`. Para tocar los mapas, `levels.ts`. Casi nunca hace falta
@@ -186,8 +186,12 @@ minas no dependen del tema y se generan una vez.
   resto de caché primero (los nombres llevan hash). **Al cambiar la estrategia hay que subir
   `CACHE`**, o los navegadores se quedan con la caché vieja.
 - Solo se registra en producción (`import.meta.env.PROD`): en `npm run dev` estorba.
-- Los iconos los genera `scripts/make-icons.mjs` (PNG a mano con `zlib`, sin dependencias). Si se
-  cambia el dibujo, `npm run icons`.
+- `logo.png` lo carga Phaser en `TitleScene.preload()`, así que **no aparece en el HTML** y el
+  precache del worker lo añade a mano. Si algún día se cargan más assets así, hay que añadirlos ahí.
+- Los iconos y el logo salen del original en 1024 recortado y reescalado (`icon-192`, `icon-512`,
+  `apple-touch-icon`, `logo`). `scripts/make-icons.mjs` genera un icono de respaldo dibujado a mano
+  con `zlib` y sin dependencias (`npm run icons`); ya no se usa, pero sirve si se quiere volver a un
+  icono vectorial.
 - `.github/workflows/deploy.yml` construye y publica en GitHub Pages en cada push a `main`.
 
 ## Estado
@@ -203,14 +207,10 @@ bastante más letal después de esa estimación. Si hay que aflojar, los primero
 
 ### 1. Publicar de verdad
 
-Todo lo del lado del código está hecho; falta lo que exige una cuenta:
-
-```bash
-git init && git add -A && git commit -m "We Tanks" && git branch -M main
-```
-
-Crear el repo en GitHub, `git remote add origin ...`, `git push -u origin main` y en
-*Settings → Pages* elegir **GitHub Actions** como origen. El workflow ya está en el repo.
+Todo lo del lado del código está hecho y el repo git ya existe con el primer commit en `main`.
+Falta lo que exige una cuenta: crear el repo vacío en GitHub, `git remote add origin ...`,
+`git push -u origin main` y en *Settings → Pages* elegir **GitHub Actions** como origen. El
+workflow ya está en el repo.
 
 ### 2. Vibración en los impactos
 
