@@ -197,6 +197,12 @@ export class Sfx {
     this.tone("triangle", 900, 520, 0.06, 0.1);
   }
 
+  /** Dos balas anulandose: chispazo metalico. */
+  clash() {
+    this.tone("square", 1800, 700, 0.07, 0.12);
+    this.burst(0.09, 0.16, 6000, 1200);
+  }
+
   explode() {
     this.burst(0.5, 0.7, 1400, 60);
     this.tone("sine", 160, 40, 0.35, 0.25);

@@ -68,6 +68,9 @@ se dispara al soltar, que desaparece con tu primer disparo. Las explosiones vibr
   que en el original.
 - Balas: máximo 5 tuyas en pantalla, 3 por enemigo. Rebotan 1 vez (2 los tipos avanzados, que
   además disparan más rápido y salen en naranja) y se destruyen al siguiente impacto.
+- **Bala contra bala se anulan las dos**, así que puedes defenderte de un tiro cantado. Las tuyas
+  van en azul (`0x8fd8ff`, igual que la línea de mira y el contador del HUD) y las enemigas en
+  crema o naranja: con balas cruzándose hay que saber de un vistazo cuál es cuál.
 - Minas: máximo 2 tuyas. Se arman en 0.9 s, detonan a los 5 s o si alguien se acerca, encadenan
   con otras minas y revientan los muros de corcho. El acero no se destruye.
 - 3 vidas, una extra cada 5 niveles superados. Perder una reinicia el nivel conservando los puntos;
@@ -168,11 +171,19 @@ el coste real por frame: ahora mismo 0.37 ms de media con 6 enemigos, sobre un p
 Todo lo visual del escenario está en `theme.ts` y no toca la jugabilidad: los muros y el suelo
 comparten la rejilla lógica `grid`, que es solo colisión.
 
-- Cuatro paletas (**arena, hierba, hangar, nieve**) que rotan cada 5 niveles (`themeForLevel()`).
-  Cambian suelo, gravilla, rejilla, acero y corcho.
+- Seis paletas (**arena, hierba, óxido, hangar, asfalto, nieve**) que rotan cada 3 niveles
+  (`themeForLevel()`): con 18 niveles sale cada una una vez. Cambian suelo, gravilla, rejilla,
+  acero y corcho.
+- Cada tema tiene además un `detail` que se pinta en el suelo y es lo que evita que sea "el mismo
+  suelo de otro color": `dunas` (crestas curvas), `matas` (briznas de hierba), `placas` (chapas
+  atornilladas con juntas y remaches) y `hielo` (manchas claras con borde).
 - El suelo es **una textura de canvas del tamaño del mundo** (960×540) con base, manchas suaves,
-  gravilla, rejilla y viñeta horneadas. Un `TileSprite` repetido se notaba; a este tamaño la memoria
-  da igual y no hay costuras.
+  detalle, gravilla, rejilla y viñeta horneadas. Un `TileSprite` repetido se notaba; a este tamaño
+  la memoria da igual y no hay costuras.
+- **Cada nivel repinta esa misma textura** con un azar sembrado con el número de nivel, así que los
+  tres niveles de un tramo no son idénticos y el nivel 7 se ve siempre igual. Ojo: se **repinta**,
+  no se borra y se recrea. `textures.remove()` deja sin frame a las imágenes que aún apunten a la
+  textura (la del título, sin ir más lejos) y el render revienta con un `resolution` de `null`.
 - Encima va una **viñeta suelta** (depth 100) que oscurece también muros y tanques del borde, por
   debajo del joystick y del HUD.
 - `scatterDecals()` reparte manchas y grietas por las celdas libres, sin colisión, en un solo

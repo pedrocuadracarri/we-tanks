@@ -76,6 +76,7 @@ export class GameScene extends Phaser.Scene {
   private bankShotBudget = 0; // como mucho una busqueda de rebote por frame
 
   private trail!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private trailCool!: Phaser.GameObjects.Particles.ParticleEmitter;
   private debris!: Phaser.GameObjects.Particles.ParticleEmitter;
 
   private moveStick!: Joystick;
@@ -114,7 +115,7 @@ export class GameScene extends Phaser.Scene {
     this.grid = Array.from({ length: ROWS }, () => Array<boolean>(COLS).fill(false));
 
     this.physics.world.setBounds(0, 0, WIDTH, HEIGHT);
-    applyBackdrop(this, this.theme);
+    applyBackdrop(this, this.theme, this.level);
 
     this.steel = this.physics.add.staticGroup();
     this.corks = this.physics.add.staticGroup();
@@ -122,15 +123,19 @@ export class GameScene extends Phaser.Scene {
     this.bullets = this.physics.add.group();
     this.mines = this.physics.add.group();
 
-    this.trail = this.add
-      .particles(0, 0, "spark", {
-        lifespan: 200,
-        scale: { start: 0.6, end: 0 },
-        alpha: { start: 0.45, end: 0 },
-        speed: 0,
-        emitting: false,
-      })
-      .setDepth(19);
+    const trail = (tint: number) =>
+      this.add
+        .particles(0, 0, "spark", {
+          lifespan: 200,
+          scale: { start: 0.6, end: 0 },
+          alpha: { start: 0.45, end: 0 },
+          speed: 0,
+          tint,
+          emitting: false,
+        })
+        .setDepth(19);
+    this.trail = trail(0xffd9a0); // enemigas
+    this.trailCool = trail(0x8fd8ff); // tuyas
     this.debris = this.add
       .particles(0, 0, "spark", {
         lifespan: { min: 250, max: 600 },
@@ -144,7 +149,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(26);
 
     this.buildLevel();
-    scatterDecals(this, this.theme, (r, c) => !this.grid[r][c]);
+    scatterDecals(this, this.theme, this.level, (r, c) => !this.grid[r][c]);
 
     this.physics.add.collider(this.tanks, this.steel);
     this.physics.add.collider(this.tanks, this.corks);
@@ -152,6 +157,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.bullets, this.steel, this.onBulletHitWall, undefined, this);
     this.physics.add.collider(this.bullets, this.corks, this.onBulletHitWall, undefined, this);
     this.physics.add.overlap(this.bullets, this.tanks, this.onBulletHitTank, undefined, this);
+    this.physics.add.collider(this.bullets, this.bullets, this.onBulletsClash, undefined, this);
     const world = this.physics.world; // en shutdown this.physics.world ya es null
     world.on("worldbounds", this.onBulletHitWorldBounds, this);
     this.events.once("shutdown", () => world.off("worldbounds", this.onBulletHitWorldBounds, this));
@@ -456,11 +462,11 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < points.length - 1; i++) {
       const a = points[i];
       const b = points[i + 1];
-      this.aimLine.lineStyle(i === 0 ? 3 : 2, 0xffd166, i === 0 ? 0.55 : 0.25);
+      this.aimLine.lineStyle(i === 0 ? 3 : 2, 0x8fd8ff, i === 0 ? 0.6 : 0.28);
       this.aimLine.lineBetween(a.x!, a.y!, b.x!, b.y!);
     }
     const end = points[points.length - 1];
-    this.aimLine.fillStyle(0xffd166, 0.5).fillCircle(end.x!, end.y!, 4);
+    this.aimLine.fillStyle(0x8fd8ff, 0.55).fillCircle(end.x!, end.y!, 4);
   }
 
   private buildMineButton() {
@@ -503,7 +509,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5, 0)
       .setDepth(200);
     this.hudAmmo = this.add
-      .text(12, 34, "", { ...style, fontSize: "17px", color: "#f5e7b0" })
+      .text(12, 34, "", { ...style, fontSize: "17px", color: "#8fd8ff" })
       .setDepth(200);
     if (this.level === 0) {
       this.hint = this.add
@@ -567,7 +573,7 @@ export class GameScene extends Phaser.Scene {
       if (t.cfg.invisible) this.updateStealth(t, time);
     }
     for (const b of this.bullets.getChildren() as Bullet[]) {
-      if (b.active) this.trail.emitParticleAt(b.x, b.y);
+      if (b.active) (b.owner.isPlayer ? this.trailCool : this.trail).emitParticleAt(b.x, b.y);
     }
     this.drawAim();
     this.updateAmmo();
@@ -801,7 +807,9 @@ export class GameScene extends Phaser.Scene {
     (bullet.body as Phaser.Physics.Arcade.Body).onWorldBounds = true;
     bullet.setVelocity(Math.cos(angle) * cfg.bulletSpeed, Math.sin(angle) * cfg.bulletSpeed);
     bullet.setDepth(20);
-    bullet.setTint(cfg.bounces > 1 ? 0xff9f5b : 0xf5e7b0);
+    // las tuyas van en azul: con balas cruzandose hay que saber cual es cual
+    bullet.setTint(tank.isPlayer ? 0x8fd8ff : cfg.bounces > 1 ? 0xff9f5b : 0xf5e7b0);
+    this.muzzleFlash(bullet.x, bullet.y, tank.isPlayer);
     bullet.owner = tank;
     bullet.bounces = 0;
     bullet.maxBounces = cfg.bounces;
@@ -838,8 +846,42 @@ export class GameScene extends Phaser.Scene {
     bullet.destroy();
   }
 
+  private muzzleFlash(x: number, y: number, isPlayer: boolean) {
+    const flash = this.add.circle(x, y, 10, isPlayer ? 0xcfeaff : 0xfff2c4, 0.85).setDepth(21);
+    this.tweens.add({
+      targets: flash,
+      scale: 0.2,
+      alpha: 0,
+      duration: 140,
+      onComplete: () => flash.destroy(),
+    });
+  }
+
   private onBulletHitWall: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (obj) => {
     this.bounce(obj as Bullet);
+  };
+
+  /** Bala contra bala: se anulan las dos. Sirve para defenderte de un tiro cantado. */
+  private onBulletsClash: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (a, b) => {
+    const one = a as Bullet;
+    const two = b as Bullet;
+    if (!one.active || !two.active) return;
+    const x = (one.x + two.x) / 2;
+    const y = (one.y + two.y) / 2;
+    one.destroy();
+    two.destroy();
+
+    this.debris.explode(10, x, y);
+    const ring = this.add.circle(x, y, 7, 0xffffff, 0.9).setDepth(28);
+    this.tweens.add({
+      targets: ring,
+      scale: 2.6,
+      alpha: 0,
+      duration: 240,
+      onComplete: () => ring.destroy(),
+    });
+    sfx.clash();
+    vibrate(15);
   };
 
   private onBulletHitWorldBounds(body: Phaser.Physics.Arcade.Body) {
