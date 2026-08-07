@@ -18,10 +18,12 @@ el móvil mediante una media query de `orientation: portrait`; no hay JavaScript
 
 ## Stack
 
-- **Phaser 3.90** con física Arcade. Todas las texturas del juego se generan en tiempo de ejecución
+- **Phaser 4.2** con física Arcade (la API que se usa aquí es la de siempre). Todas las texturas del juego se generan en tiempo de ejecución
   con `Graphics.generateTexture()` y todos los sonidos se sintetizan con WebAudio. El único fichero
   que se descarga aparte del bundle es `public/logo.png` (el logo del título), y los iconos de la PWA.
-- **Vite 8** + **TypeScript 5.9** en modo estricto.
+- **Vite 8** + **TypeScript 7** en modo estricto. `package.json` tiene que declarar las versiones
+  que hay instaladas de verdad: si los rangos no cuadran con `package-lock.json`, `npm ci` falla en
+  el workflow aunque `npm run build` funcione en local.
 - Mundo fijo de **960×540** con `Scale.FIT`, así que escala a cualquier pantalla sin recolocar nada.
 
 ## Archivos
